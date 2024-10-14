@@ -1,5 +1,5 @@
 //! When you wear clothes they get dirty. When you wash them they get wet. When you dry them, they're
-//! ready to be worn again. Or course washing and wearing clothes takes its toll on the clothes, and
+//! ready to be worn again. Of course washing and wearing clothes takes its toll on the clothes, and
 //! eventually they get tattered.
 
 use super::StateMachine;
@@ -40,7 +40,25 @@ impl StateMachine for ClothesMachine {
     type Transition = ClothesAction;
 
     fn next_state(starting_state: &ClothesState, t: &ClothesAction) -> ClothesState {
-        todo!("Exercise 3")
+        if starting_state == &ClothesState::Tattered {
+            return ClothesState::Tattered;
+        }
+        let life = match *starting_state {
+            ClothesState::Clean(life) | ClothesState::Dirty(life) | ClothesState::Wet(life) => life,
+            ClothesState::Tattered => 0,
+        };
+        if life <= 1 {
+            return ClothesState::Tattered;
+        }
+        match t {
+            ClothesAction::Wear => ClothesState::Dirty(life - 1),
+            ClothesAction::Wash => ClothesState::Wet(life - 1),
+            ClothesAction::Dry => match *starting_state {
+                ClothesState::Dirty(_) => ClothesState::Dirty(life - 1),
+                ClothesState::Clean(_) | ClothesState::Wet(_) => ClothesState::Clean(life - 1),
+                ClothesState::Tattered => ClothesState::Tattered,
+            },
+        }
     }
 }
 
