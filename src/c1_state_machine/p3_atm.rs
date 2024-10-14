@@ -47,7 +47,7 @@ pub struct Atm {
     /// How much money is in the ATM
     cash_inside: u64,
     /// The machine's authentication status.
-    expected_pin_hash: Auth,
+    auth_status: Auth,
     /// All the keys that have been pressed since the last `Enter`
     keystroke_register: Vec<Key>,
 }
@@ -58,7 +58,77 @@ impl StateMachine for Atm {
     type Transition = Action;
 
     fn next_state(starting_state: &Self::State, t: &Self::Transition) -> Self::State {
-        todo!("Exercise 4")
+        let mut new_state = starting_state.clone();
+        let auth_status = starting_state.auth_status.clone();
+
+        match (auth_status, t) {
+            (Auth::Waiting, Action::SwipeCard(pin_hash)) => {
+                new_state.auth_status = Auth::Authenticating(*pin_hash);
+            }
+            (Auth::Waiting, Action::PressKey(key)) => {
+                new_state.auth_status = Auth::Waiting;
+            }
+            (Auth::Authenticating(_), Action::SwipeCard(pin_hash)) => {
+                new_state.auth_status = Auth::Authenticating(*pin_hash);
+            }
+
+            // PIN entering
+            (Auth::Authenticating(pin_hash), Action::PressKey(key)) => {
+                let kkey = key.clone();
+                match kkey {
+                    Key::One | Key::Two | Key::Three | Key::Four => {
+                        new_state.keystroke_register.push(kkey);
+                    }
+
+                    // authenticate
+                    Key::Enter => {
+                        let entered_pin_hash = crate::hash(&starting_state.keystroke_register);
+                        if pin_hash == entered_pin_hash {
+                            new_state.auth_status = Auth::Authenticated;
+                        } else {
+                            new_state.auth_status = Auth::Waiting;
+                        }
+                        new_state.keystroke_register = Vec::new();
+                    }
+                }
+            }
+
+            (Auth::Authenticated, Action::SwipeCard(pin_hash)) => {
+                new_state.auth_status = Auth::Authenticating(*pin_hash);
+            }
+
+            // cash withdrawal amount entering
+            (Auth::Authenticated, Action::PressKey(key)) => {
+                let kkey = key.clone();
+                match kkey {
+                    Key::One | Key::Two | Key::Three | Key::Four => {
+                        new_state.keystroke_register.push(kkey);
+                    }
+
+                    // withdraw
+                    Key::Enter => {
+                        let amount: u64 = starting_state
+                            .keystroke_register
+                            .iter()
+                            .filter_map(|key| match key {
+                                Key::One => Some(1),
+                                Key::Two => Some(2),
+                                Key::Three => Some(3),
+                                Key::Four => Some(4),
+                                _ => None,
+                            })
+                            .fold(0, |acc, digit| acc * 10 + digit);
+
+                        if amount <= starting_state.cash_inside {
+                            new_state.cash_inside = starting_state.cash_inside - amount
+                        }
+                        new_state.keystroke_register = Vec::new();
+                        new_state.auth_status = Auth::Waiting;
+                    }
+                }
+            }
+        }
+        new_state
     }
 }
 
@@ -66,13 +136,13 @@ impl StateMachine for Atm {
 fn sm_3_simple_swipe_card() {
     let start = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Waiting,
+        auth_status: Auth::Waiting,
         keystroke_register: Vec::new(),
     };
     let end = Atm::next_state(&start, &Action::SwipeCard(1234));
     let expected = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Authenticating(1234),
+        auth_status: Auth::Authenticating(1234),
         keystroke_register: Vec::new(),
     };
 
@@ -83,13 +153,13 @@ fn sm_3_simple_swipe_card() {
 fn sm_3_swipe_card_again_part_way_through() {
     let start = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Authenticating(1234),
+        auth_status: Auth::Authenticating(1234),
         keystroke_register: Vec::new(),
     };
     let end = Atm::next_state(&start, &Action::SwipeCard(1234));
     let expected = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Authenticating(1234),
+        auth_status: Auth::Authenticating(1234),
         keystroke_register: Vec::new(),
     };
 
@@ -97,13 +167,13 @@ fn sm_3_swipe_card_again_part_way_through() {
 
     let start = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Authenticating(1234),
+        auth_status: Auth::Authenticating(1234),
         keystroke_register: vec![Key::One, Key::Three],
     };
     let end = Atm::next_state(&start, &Action::SwipeCard(1234));
     let expected = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Authenticating(1234),
+        auth_status: Auth::Authenticating(1234),
         keystroke_register: vec![Key::One, Key::Three],
     };
 
@@ -114,13 +184,13 @@ fn sm_3_swipe_card_again_part_way_through() {
 fn sm_3_press_key_before_card_swipe() {
     let start = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Waiting,
+        auth_status: Auth::Waiting,
         keystroke_register: Vec::new(),
     };
     let end = Atm::next_state(&start, &Action::PressKey(Key::One));
     let expected = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Waiting,
+        auth_status: Auth::Waiting,
         keystroke_register: Vec::new(),
     };
 
@@ -131,13 +201,13 @@ fn sm_3_press_key_before_card_swipe() {
 fn sm_3_enter_single_digit_of_pin() {
     let start = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Authenticating(1234),
+        auth_status: Auth::Authenticating(1234),
         keystroke_register: Vec::new(),
     };
     let end = Atm::next_state(&start, &Action::PressKey(Key::One));
     let expected = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Authenticating(1234),
+        auth_status: Auth::Authenticating(1234),
         keystroke_register: vec![Key::One],
     };
 
@@ -145,13 +215,13 @@ fn sm_3_enter_single_digit_of_pin() {
 
     let start = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Authenticating(1234),
+        auth_status: Auth::Authenticating(1234),
         keystroke_register: vec![Key::One],
     };
     let end1 = Atm::next_state(&start, &Action::PressKey(Key::Two));
     let expected1 = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Authenticating(1234),
+        auth_status: Auth::Authenticating(1234),
         keystroke_register: vec![Key::One, Key::Two],
     };
 
@@ -166,13 +236,13 @@ fn sm_3_enter_wrong_pin() {
 
     let start = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Authenticating(pin_hash),
+        auth_status: Auth::Authenticating(pin_hash),
         keystroke_register: vec![Key::Three, Key::Three, Key::Three, Key::Three],
     };
     let end = Atm::next_state(&start, &Action::PressKey(Key::Enter));
     let expected = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Waiting,
+        auth_status: Auth::Waiting,
         keystroke_register: Vec::new(),
     };
 
@@ -187,13 +257,13 @@ fn sm_3_enter_correct_pin() {
 
     let start = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Authenticating(pin_hash),
+        auth_status: Auth::Authenticating(pin_hash),
         keystroke_register: vec![Key::One, Key::Two, Key::Three, Key::Four],
     };
     let end = Atm::next_state(&start, &Action::PressKey(Key::Enter));
     let expected = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Authenticated,
+        auth_status: Auth::Authenticated,
         keystroke_register: Vec::new(),
     };
 
@@ -204,13 +274,13 @@ fn sm_3_enter_correct_pin() {
 fn sm_3_enter_single_digit_of_withdraw_amount() {
     let start = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Authenticated,
+        auth_status: Auth::Authenticated,
         keystroke_register: Vec::new(),
     };
     let end = Atm::next_state(&start, &Action::PressKey(Key::One));
     let expected = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Authenticated,
+        auth_status: Auth::Authenticated,
         keystroke_register: vec![Key::One],
     };
 
@@ -218,13 +288,13 @@ fn sm_3_enter_single_digit_of_withdraw_amount() {
 
     let start = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Authenticated,
+        auth_status: Auth::Authenticated,
         keystroke_register: vec![Key::One],
     };
     let end1 = Atm::next_state(&start, &Action::PressKey(Key::Four));
     let expected1 = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Authenticated,
+        auth_status: Auth::Authenticated,
         keystroke_register: vec![Key::One, Key::Four],
     };
 
@@ -235,13 +305,13 @@ fn sm_3_enter_single_digit_of_withdraw_amount() {
 fn sm_3_try_to_withdraw_too_much() {
     let start = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Authenticated,
+        auth_status: Auth::Authenticated,
         keystroke_register: vec![Key::One, Key::Four],
     };
     let end = Atm::next_state(&start, &Action::PressKey(Key::Enter));
     let expected = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Waiting,
+        auth_status: Auth::Waiting,
         keystroke_register: Vec::new(),
     };
 
@@ -252,13 +322,13 @@ fn sm_3_try_to_withdraw_too_much() {
 fn sm_3_withdraw_acceptable_amount() {
     let start = Atm {
         cash_inside: 10,
-        expected_pin_hash: Auth::Authenticated,
+        auth_status: Auth::Authenticated,
         keystroke_register: vec![Key::One],
     };
     let end = Atm::next_state(&start, &Action::PressKey(Key::Enter));
     let expected = Atm {
         cash_inside: 9,
-        expected_pin_hash: Auth::Waiting,
+        auth_status: Auth::Waiting,
         keystroke_register: Vec::new(),
     };
 
