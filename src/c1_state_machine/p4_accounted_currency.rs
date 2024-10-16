@@ -45,7 +45,61 @@ impl StateMachine for AccountedCurrency {
     type Transition = AccountingTransaction;
 
     fn next_state(starting_state: &Balances, t: &AccountingTransaction) -> Balances {
-        todo!("Exercise 1")
+        match t {
+            AccountingTransaction::Mint { minter, amount } => {
+                let mut new_state = starting_state.clone();
+                if *amount <= 0 {
+                    return new_state;
+                }
+
+                new_state
+                    .entry(minter.clone())
+                    .and_modify(|e| *e += amount)
+                    .or_insert(*amount);
+                new_state
+            }
+            AccountingTransaction::Burn { burner, amount } => {
+                let mut new_state: HashMap<User, u64> = starting_state.clone();
+
+                if let Some(&value) = new_state.get(&burner) {
+                    if value <= *amount {
+                        new_state.remove(&burner);
+                        return new_state;
+                    }
+                }
+
+                new_state.entry(burner.clone()).and_modify(|e| *e -= amount);
+                new_state
+            }
+            AccountingTransaction::Transfer {
+                sender,
+                receiver,
+                amount,
+            } => {
+                let mut new_state: HashMap<User, u64> = starting_state.clone();
+
+                if !new_state.contains_key(sender) {
+                    return new_state;
+                }
+
+                if let Some(&value) = new_state.get(&sender) {
+                    if value < *amount {
+                        return new_state;
+                    } else if value == *amount {
+                        new_state.remove(&sender);
+                    } else {
+                        new_state.entry(sender.clone()).and_modify(|e| *e -= amount);
+                    }
+                }
+
+                new_state
+                    .entry(receiver.clone())
+                    .and_modify(|e| *e += amount)
+                    .or_insert(*amount);
+
+                new_state
+            }
+        }
     }
 }
 
