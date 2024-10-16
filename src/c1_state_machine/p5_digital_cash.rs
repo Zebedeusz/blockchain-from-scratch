@@ -4,7 +4,7 @@
 //! When a state transition spends bills, new bills are created in lesser or equal amount.
 
 use super::{StateMachine, User};
-use std::collections::HashSet;
+use std::{cmp::Reverse, collections::HashSet};
 
 /// This state machine models a multi-user currency system. It tracks a set of bills in
 /// circulation, and updates that set when money is transferred.
@@ -94,7 +94,54 @@ impl StateMachine for DigitalCashSystem {
     type Transition = CashTransaction;
 
     fn next_state(starting_state: &Self::State, t: &Self::Transition) -> Self::State {
-        todo!("Exercise 1")
+        match t {
+            CashTransaction::Mint { minter, amount } => {
+                let mut new_state = starting_state.clone();
+
+                new_state.add_bill(Bill {
+                    owner: minter.clone(),
+                    amount: *amount,
+                    serial: new_state.next_serial(),
+                });
+
+                new_state
+            }
+            CashTransaction::Transfer { spends, receives } => {
+                // if amount received > amount spent -> do nothing
+                let total_spent: u128 = spends.iter().map(|bill| bill.amount as u128).sum();
+                let total_received: u128 = receives.iter().map(|bill| bill.amount as u128).sum();
+
+                let mut new_state = starting_state.clone();
+                if total_received > total_spent {
+                    return new_state;
+                }
+
+                // destroy the spends based on their serials
+                for bill in spends {
+                    if bill.amount < 1 {
+                        return starting_state.clone();
+                    }
+
+                    if !new_state.bills.remove(bill) {
+                        return starting_state.clone();
+                    }
+                }
+
+                // create new receives
+                for bill in receives {
+                    if bill.serial != new_state.next_serial() {
+                        return starting_state.clone();
+                    }
+                    if bill.amount < 1 {
+                        return starting_state.clone();
+                    }
+
+                    new_state.add_bill(bill.clone());
+                }
+
+                new_state
+            }
+        }
     }
 }
 
