@@ -5,6 +5,7 @@
 //! 2. Arbitrary / Political rules. Here we will implement two alternate validity rules
 
 use crate::hash;
+use rand::random;
 
 // We will use Rust's built-in hashing where the output type is u64. I'll make an alias
 // so the code is slightly more readable.
@@ -37,12 +38,30 @@ pub struct Header {
 impl Header {
     /// Returns a new valid genesis header.
     fn genesis() -> Self {
-        todo!("Exercise 1")
+        return Header {
+            parent: 0,
+            height: 0,
+            extrinsic: 0,
+            state: 0,
+            consensus_digest: 0,
+        };
     }
 
     /// Create and return a valid child header.
     fn child(&self, extrinsic: u64) -> Self {
-        todo!("Exercise 2")
+        let mut child = Header {
+            parent: hash(&self),
+            height: self.height + 1,
+            extrinsic: extrinsic,
+            state: self.state + extrinsic,
+            consensus_digest: rand::random::<u32>() as u64,
+        };
+
+        while hash(&child) >= THRESHOLD {
+            child.consensus_digest = rand::random::<u32>() as u64;
+        }
+
+        return child;
     }
 
     /// Verify that all the given headers form a valid chain from this header to the tip.
@@ -50,7 +69,27 @@ impl Header {
     /// In addition to all the rules we had before, we now need to check that the block hash
     /// is below a specific threshold.
     fn verify_sub_chain(&self, chain: &[Header]) -> bool {
-        todo!("Exercise 3")
+        let mut curr_block = self.clone();
+
+        for i in 0..chain.len() {
+            let header_from_chain = chain.get(i).unwrap();
+            if header_from_chain.parent != hash(&curr_block) {
+                return false;
+            }
+            if header_from_chain.height != curr_block.height + 1 {
+                return false;
+            }
+            if header_from_chain.state != curr_block.state + header_from_chain.extrinsic {
+                return false;
+            }
+            if hash(&header_from_chain) >= THRESHOLD {
+                return false;
+            }
+
+            curr_block = header_from_chain.clone();
+        }
+
+        return true;
     }
 
     // After the blockchain ran for a while, a political rift formed in the community.
@@ -62,14 +101,76 @@ impl Header {
     /// verify that the given headers form a valid chain.
     /// In this case "valid" means that the STATE MUST BE EVEN.
     fn verify_sub_chain_even(&self, chain: &[Header]) -> bool {
-        todo!("Exercise 4")
+        let mut curr_block = self.clone();
+
+        for i in 0..chain.len() {
+            let header_from_chain = chain.get(i).unwrap();
+            if header_from_chain.parent != hash(&curr_block) {
+                return false;
+            }
+            if header_from_chain.height != curr_block.height + 1 {
+                return false;
+            }
+            if hash(&header_from_chain) >= THRESHOLD {
+                return false;
+            }
+            if header_from_chain.state != curr_block.state + header_from_chain.extrinsic {
+                return false;
+            }
+
+            if chain.len() as u64 - FORK_HEIGHT <= i as u64 && header_from_chain.state % 2 != 0 {
+                return false;
+            }
+
+            curr_block = header_from_chain.clone();
+        }
+
+        return true;
     }
 
     /// verify that the given headers form a valid chain.
     /// In this case "valid" means that the STATE MUST BE ODD.
     fn verify_sub_chain_odd(&self, chain: &[Header]) -> bool {
-        todo!("Exercise 5")
+        let mut curr_block = self.clone();
+
+        for i in 0..chain.len() {
+            let header_from_chain = chain.get(i).unwrap();
+            if header_from_chain.parent != hash(&curr_block) {
+                return false;
+            }
+            if header_from_chain.height != curr_block.height + 1 {
+                return false;
+            }
+            if hash(&header_from_chain) >= THRESHOLD {
+                return false;
+            }
+            if header_from_chain.state != curr_block.state + header_from_chain.extrinsic {
+                return false;
+            }
+
+            if chain.len() as u64 - FORK_HEIGHT <= i as u64 && header_from_chain.state % 2 != 1 {
+                return false;
+            }
+
+            curr_block = header_from_chain.clone();
+        }
+
+        return true;
     }
+}
+
+/// Build and return a valid chain with the given number of blocks.
+fn build_valid_chain(n: u64) -> Vec<Header> {
+    let mut v = Vec::new();
+    let g = Header::genesis();
+    v.push(g.clone());
+    let mut parent = g;
+    for _ in 0..n {
+        let child = parent.child((rand::random::<u32>() / 1000000 + 1) as u64);
+        v.push(child.clone());
+        parent = child;
+    }
+    v
 }
 
 /// Build and return two different chains with a common prefix.
@@ -89,7 +190,36 @@ impl Header {
 /// G -- 1 -- 2
 ///            \-- 3'-- 4'
 fn build_contentious_forked_chain() -> (Vec<Header>, Vec<Header>, Vec<Header>) {
-    todo!("Exercise 6")
+    let chain = build_valid_chain(10);
+
+    let mut fork_1 = Vec::new();
+    let mut fork_2 = Vec::new();
+
+    let mut parent = chain.last().unwrap().clone();
+    for _ in 0..FORK_HEIGHT {
+        let mut extrinsic: u64 = 1;
+        if parent.state % 2 == 0 {
+            extrinsic = 2;
+        }
+
+        let child = parent.child(extrinsic);
+        fork_1.push(child.clone());
+        parent = child;
+    }
+
+    parent = chain.last().unwrap().clone();
+    for _ in 0..FORK_HEIGHT {
+        let mut extrinsic: u64 = 2;
+        if parent.state % 2 == 0 {
+            extrinsic = 1;
+        }
+
+        let child = parent.child(extrinsic);
+        fork_2.push(child.clone());
+        parent = child;
+    }
+
+    (chain, fork_1, fork_2)
 }
 
 // To run these tests: `cargo test bc_3`
