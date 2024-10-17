@@ -5,6 +5,7 @@
 //! generic consensus framework that we will use throughout the rest of the chapter.
 
 use super::{Consensus, Header};
+use crate::hash;
 
 /// A Proof of Work consensus engine. This is the same consensus logic that we
 /// implemented in the previous chapter. Here we simply re-implement it in the
@@ -19,24 +20,39 @@ impl Consensus for Pow {
     /// Check that the provided header's hash is below the required threshold.
     /// This does not rely on the parent digest at all.
     fn validate(&self, _: &Self::Digest, header: &Header<Self::Digest>) -> bool {
-        todo!("Exercise 1")
+        return header.consensus_digest < self.threshold;
     }
 
     /// Mine a new PoW seal for the partial header provided.
     /// This does not rely on the parent digest at all.
     fn seal(&self, _: &Self::Digest, partial_header: Header<()>) -> Option<Header<Self::Digest>> {
-        todo!("Exercise 2")
+        let mut consensus_digest = rand::random();
+        while hash(&partial_header) >= self.threshold {
+            consensus_digest = rand::random();
+        }
+        let header: Header<Self::Digest> = Header {
+            consensus_digest,
+            state_root: partial_header.state_root,
+            extrinsics_root: partial_header.extrinsics_root,
+            parent: partial_header.parent,
+            height: partial_header.height,
+        };
+        return Some(header);
     }
 }
 
 /// Create a PoW consensus engine that has a difficulty threshold such that roughly 1 in 100 blocks
 /// with randomly drawn nonces will be valid. That is: the threshold should be u64::max_value() / 100.
 pub fn moderate_difficulty_pow() -> Pow {
-    todo!("Exercise 3")
+    return Pow {
+        threshold: u64::max_value() / 100,
+    };
 }
 
 /// Create an instance of the PoW Consensus that behaves identically to the trivial
 /// consensus implementation for `()` from the module level.
 pub fn trivial_always_valid_pow() -> Pow {
-    todo!("Exercise 4")
+    return Pow {
+        threshold: u64::max_value(),
+    };
 }

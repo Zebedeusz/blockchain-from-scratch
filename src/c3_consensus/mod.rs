@@ -76,7 +76,12 @@ pub trait Consensus {
         parent_digest: &Self::Digest,
         chain: &[Header<Self::Digest>],
     ) -> bool {
-        todo!("Exercise 1")
+        for header in chain {
+            if !self.validate(parent_digest, header) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// A human-readable name for this engine. This may be used in user-facing
@@ -94,12 +99,12 @@ impl Consensus for () {
 
     /// All blocks are considered valid
     fn validate(&self, _: &Self::Digest, _: &Header<Self::Digest>) -> bool {
-        todo!("Exercise 2")
+        return true;
     }
 
     /// No real sealing is required.
     fn seal(&self, _: &Self::Digest, partial_header: Header<()>) -> Option<Header<Self::Digest>> {
-        todo!("Exercise 3")
+        return Some(partial_header);
     }
 }
 

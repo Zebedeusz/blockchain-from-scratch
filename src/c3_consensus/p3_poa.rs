@@ -19,16 +19,19 @@ pub struct SimplePoa {
 impl Consensus for SimplePoa {
     type Digest = ConsensusAuthority;
 
-    fn validate(&self, parent_digest: &Self::Digest, header: &Header<Self::Digest>) -> bool {
-        todo!("Exercise 1")
+    fn validate(&self, _: &Self::Digest, header: &Header<Self::Digest>) -> bool {
+        return self.authorities.contains(&header.consensus_digest);
     }
 
-    fn seal(
-        &self,
-        parent_digest: &Self::Digest,
-        partial_header: Header<()>,
-    ) -> Option<Header<Self::Digest>> {
-        todo!("Exercise 2")
+    fn seal(&self, _: &Self::Digest, partial_header: Header<()>) -> Option<Header<Self::Digest>> {
+        let header: Header<Self::Digest> = Header {
+            consensus_digest: self.authorities.get(0).unwrap().clone(),
+            state_root: partial_header.state_root,
+            extrinsics_root: partial_header.extrinsics_root,
+            parent: partial_header.parent,
+            height: partial_header.height,
+        };
+        return Some(header);
     }
 }
 
@@ -42,16 +45,34 @@ struct PoaRoundRobinByHeight {
 impl Consensus for PoaRoundRobinByHeight {
     type Digest = ConsensusAuthority;
 
-    fn validate(&self, parent_digest: &Self::Digest, header: &Header<Self::Digest>) -> bool {
-        todo!("Exercise 3")
+    // TODO TESTS
+    fn validate(&self, _: &Self::Digest, header: &Header<Self::Digest>) -> bool {
+        let auth_that_was_supposed_to_sign = header.height % (self.authorities.len() as u64) - 1;
+        return header.consensus_digest
+            == self
+                .authorities
+                .get(auth_that_was_supposed_to_sign as usize)
+                .unwrap()
+                .clone();
     }
 
-    fn seal(
-        &self,
-        parent_digest: &Self::Digest,
-        partial_header: Header<()>,
-    ) -> Option<Header<Self::Digest>> {
-        todo!("Exercise 4")
+    // TODO TESTS
+    fn seal(&self, _: &Self::Digest, partial_header: Header<()>) -> Option<Header<Self::Digest>> {
+        let auth_that_is_supposed_to_sign =
+            partial_header.height % (self.authorities.len() as u64) - 1;
+
+        let header: Header<Self::Digest> = Header {
+            consensus_digest: self
+                .authorities
+                .get(auth_that_is_supposed_to_sign as usize)
+                .unwrap()
+                .clone(),
+            state_root: partial_header.state_root,
+            extrinsics_root: partial_header.extrinsics_root,
+            parent: partial_header.parent,
+            height: partial_header.height,
+        };
+        return Some(header);
     }
 }
 
@@ -79,8 +100,26 @@ struct SlotDigest {
 impl Consensus for PoaRoundRobinBySlot {
     type Digest = SlotDigest;
 
+    // TODO TESTS
     fn validate(&self, parent_digest: &Self::Digest, header: &Header<Self::Digest>) -> bool {
-        todo!("Exercise 5")
+        if parent_digest.slot >= header.consensus_digest.slot {
+            return false;
+        }
+
+        let parent_pos = self
+            .authorities
+            .iter()
+            .position(|&a| a == parent_digest.signature)
+            .unwrap();
+
+        let next_auth = if parent_pos == self.authorities.len() - 1 {
+            0
+        } else {
+            parent_pos + 1
+        };
+
+        return header.consensus_digest.signature
+            == self.authorities.get(next_auth).unwrap().clone();
     }
 
     fn seal(
@@ -88,6 +127,27 @@ impl Consensus for PoaRoundRobinBySlot {
         parent_digest: &Self::Digest,
         partial_header: Header<()>,
     ) -> Option<Header<Self::Digest>> {
-        todo!("Exercise 6")
+        let parent_pos = self
+            .authorities
+            .iter()
+            .position(|&a| a == parent_digest.signature)
+            .unwrap();
+        let next_auth = if parent_pos == self.authorities.len() - 1 {
+            0
+        } else {
+            parent_pos + 1
+        };
+
+        let header: Header<Self::Digest> = Header {
+            consensus_digest: SlotDigest {
+                slot: parent_digest.slot + 1,
+                signature: self.authorities.get(next_auth).unwrap().clone(),
+            },
+            state_root: partial_header.state_root,
+            extrinsics_root: partial_header.extrinsics_root,
+            parent: partial_header.parent,
+            height: partial_header.height,
+        };
+        return Some(header);
     }
 }
