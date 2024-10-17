@@ -16,6 +16,33 @@ pub struct SimplePoa {
     pub authorities: Vec<ConsensusAuthority>,
 }
 
+impl Default for Header<ConsensusAuthority> {
+    fn default() -> Self {
+        Header {
+            consensus_digest: ConsensusAuthority::Alice,
+            state_root: Default::default(),
+            extrinsics_root: Default::default(),
+            parent: Default::default(),
+            height: Default::default(),
+        }
+    }
+}
+
+impl Default for Header<SlotDigest> {
+    fn default() -> Self {
+        Header {
+            consensus_digest: SlotDigest {
+                slot: 1,
+                signature: ConsensusAuthority::Alice,
+            },
+            state_root: Default::default(),
+            extrinsics_root: Default::default(),
+            parent: Default::default(),
+            height: Default::default(),
+        }
+    }
+}
+
 impl Consensus for SimplePoa {
     type Digest = ConsensusAuthority;
 
@@ -45,9 +72,15 @@ struct PoaRoundRobinByHeight {
 impl Consensus for PoaRoundRobinByHeight {
     type Digest = ConsensusAuthority;
 
-    // TODO TESTS
     fn validate(&self, _: &Self::Digest, header: &Header<Self::Digest>) -> bool {
-        let auth_that_was_supposed_to_sign = header.height % (self.authorities.len() as u64) - 1;
+        // f(1,4) -> 0 // 1 % 4 = 1
+        // f(2,4) -> 1 // 2 % 4 = 2
+        // f(3,4) -> 2 // 3 % 4 = 3
+        // f(4,4) -> 3 // 4 % 4 = 0
+        // f(5,4) -> 0 // 5 % 4 = 1
+        // f(6,4) -> 1 // 6 % 4 = 2
+
+        let auth_that_was_supposed_to_sign = (header.height - 1) % (self.authorities.len() as u64);
         return header.consensus_digest
             == self
                 .authorities
@@ -56,10 +89,9 @@ impl Consensus for PoaRoundRobinByHeight {
                 .clone();
     }
 
-    // TODO TESTS
     fn seal(&self, _: &Self::Digest, partial_header: Header<()>) -> Option<Header<Self::Digest>> {
         let auth_that_is_supposed_to_sign =
-            partial_header.height % (self.authorities.len() as u64) - 1;
+            (partial_header.height - 1) % (self.authorities.len() as u64);
 
         let header: Header<Self::Digest> = Header {
             consensus_digest: self
@@ -100,7 +132,6 @@ struct SlotDigest {
 impl Consensus for PoaRoundRobinBySlot {
     type Digest = SlotDigest;
 
-    // TODO TESTS
     fn validate(&self, parent_digest: &Self::Digest, header: &Header<Self::Digest>) -> bool {
         if parent_digest.slot >= header.consensus_digest.slot {
             return false;
@@ -150,4 +181,140 @@ impl Consensus for PoaRoundRobinBySlot {
         };
         return Some(header);
     }
+}
+
+// --- TESTS ---
+#[test]
+fn cs3_simple_poa_validate() {
+    let authorities = vec![ConsensusAuthority::Alice, ConsensusAuthority::Bob];
+    let poa = SimplePoa { authorities };
+
+    let mut header = Header::<<SimplePoa as Consensus>::Digest>::default();
+    header.consensus_digest = ConsensusAuthority::Alice;
+
+    assert!(poa.validate(&ConsensusAuthority::Alice, &header));
+
+    header.consensus_digest = ConsensusAuthority::Charlie;
+    assert!(!poa.validate(&ConsensusAuthority::Alice, &header));
+}
+
+#[test]
+fn cs3_simple_poa_seal() {
+    let authorities = vec![ConsensusAuthority::Alice, ConsensusAuthority::Bob];
+    let poa = SimplePoa { authorities };
+
+    let partial_header = Header::<()>::default();
+    let sealed_header = poa
+        .seal(&ConsensusAuthority::Alice, partial_header)
+        .unwrap();
+
+    assert_eq!(sealed_header.consensus_digest, ConsensusAuthority::Alice);
+}
+
+#[test]
+fn cs3_poa_round_robin_by_height_validate() {
+    let authorities = vec![ConsensusAuthority::Alice, ConsensusAuthority::Bob];
+    let poa = PoaRoundRobinByHeight { authorities };
+
+    let mut header = Header {
+        height: 1,
+        consensus_digest: ConsensusAuthority::Alice,
+        ..Default::default()
+    };
+
+    assert!(poa.validate(&ConsensusAuthority::Alice, &header));
+
+    header.consensus_digest = ConsensusAuthority::Bob;
+    assert!(!poa.validate(&ConsensusAuthority::Alice, &header));
+
+    header.height = 2;
+    assert!(poa.validate(&ConsensusAuthority::Alice, &header));
+}
+
+#[test]
+fn cs3_poa_round_robin_by_height_seal() {
+    let authorities = vec![ConsensusAuthority::Alice, ConsensusAuthority::Bob];
+    let poa = PoaRoundRobinByHeight { authorities };
+
+    let mut header = Header {
+        height: 1,
+        ..Default::default()
+    };
+    let mut sealed_header = poa
+        .seal(&ConsensusAuthority::Alice, header.clone())
+        .unwrap();
+
+    assert_eq!(sealed_header.consensus_digest, ConsensusAuthority::Alice);
+
+    header.height = 2;
+    sealed_header = poa
+        .seal(&ConsensusAuthority::Alice, header.clone())
+        .unwrap();
+    assert_eq!(sealed_header.consensus_digest, ConsensusAuthority::Bob);
+
+    header.height = 3;
+    sealed_header = poa.seal(&ConsensusAuthority::Alice, header).unwrap();
+    assert_eq!(sealed_header.consensus_digest, ConsensusAuthority::Alice);
+}
+
+#[test]
+fn cs3_poa_round_robin_by_slot_validate() {
+    let authorities = vec![ConsensusAuthority::Alice, ConsensusAuthority::Bob];
+    let poa = PoaRoundRobinBySlot { authorities };
+
+    let parent_digest = SlotDigest {
+        slot: 1,
+        signature: ConsensusAuthority::Alice,
+    };
+
+    let header = Header {
+        consensus_digest: SlotDigest {
+            slot: 2,
+            signature: ConsensusAuthority::Bob,
+        },
+        ..Default::default()
+    };
+
+    assert!(poa.validate(&parent_digest, &header));
+    assert!(!poa.validate(
+        &parent_digest,
+        &Header {
+            consensus_digest: SlotDigest {
+                slot: 1,
+                signature: ConsensusAuthority::Bob,
+            },
+            ..Default::default()
+        }
+    ));
+}
+
+#[test]
+fn cs3_poa_round_robin_by_slot_seal() {
+    let authorities = vec![ConsensusAuthority::Alice, ConsensusAuthority::Bob];
+    let poa = PoaRoundRobinBySlot { authorities };
+
+    let parent_digest = SlotDigest {
+        slot: 1,
+        signature: ConsensusAuthority::Alice,
+    };
+
+    let mut partial_header = Header::<()>::default();
+    let mut sealed_header = poa.seal(&parent_digest, partial_header).unwrap();
+
+    assert_eq!(sealed_header.consensus_digest.slot, 2);
+    assert_eq!(
+        sealed_header.consensus_digest.signature,
+        ConsensusAuthority::Bob
+    );
+
+    partial_header = Header::<()>::default();
+    sealed_header = poa
+        .seal(&sealed_header.consensus_digest, partial_header)
+        .unwrap();
+
+    assert_eq!(sealed_header.consensus_digest.slot, 3);
+    assert_eq!(
+        sealed_header.consensus_digest.signature,
+        ConsensusAuthority::Alice
+    );
 }
