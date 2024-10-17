@@ -26,17 +26,16 @@ impl Consensus for Pow {
     /// Mine a new PoW seal for the partial header provided.
     /// This does not rely on the parent digest at all.
     fn seal(&self, _: &Self::Digest, partial_header: Header<()>) -> Option<Header<Self::Digest>> {
-        let mut consensus_digest = rand::random();
-        while hash(&partial_header) >= self.threshold {
-            consensus_digest = rand::random();
-        }
-        let header: Header<Self::Digest> = Header {
-            consensus_digest,
+        let mut header: Header<Self::Digest> = Header {
+            consensus_digest: rand::random::<u32>() as u64,
             state_root: partial_header.state_root,
             extrinsics_root: partial_header.extrinsics_root,
             parent: partial_header.parent,
             height: partial_header.height,
         };
+        while hash(&header) >= self.threshold {
+            header.consensus_digest = rand::random::<u32>() as u64;
+        }
         return Some(header);
     }
 }

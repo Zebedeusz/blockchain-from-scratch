@@ -29,13 +29,13 @@ pub struct State {
 /// author's state
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Header {
-    parent: Hash,
-    height: u64,
-    extrinsics_root: Hash,
+    pub parent: Hash,
+    pub height: u64,
+    pub extrinsics_root: Hash,
     /// Stores a cryptographic commitment, like a Merkle root or a hash to the complete
     /// post state.
-    state_root: Hash,
-    consensus_digest: u64,
+    pub state_root: Hash,
+    pub consensus_digest: u64,
 }
 
 // Methods for creating and verifying headers.
@@ -46,7 +46,7 @@ pub struct Header {
 // default. So we need to commit the initial state root to the genesis header here.
 impl Header {
     /// Returns a new valid genesis header.
-    fn genesis(genesis_state_root: Hash) -> Self {
+    pub fn genesis(genesis_state_root: Hash) -> Self {
         return Header {
             parent: 0,
             height: 0,
@@ -60,7 +60,7 @@ impl Header {
     ///
     /// The state root is passed in similarly to how the complete state
     /// was in the previous section.
-    fn child(&self, extrinsics_root: Hash, state_root: Hash) -> Self {
+    pub fn child(&self, extrinsics_root: Hash, state_root: Hash) -> Self {
         let mut child = Header {
             parent: hash(&self),
             height: self.height + 1,
