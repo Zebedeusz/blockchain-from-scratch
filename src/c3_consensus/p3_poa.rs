@@ -65,8 +65,8 @@ impl Consensus for SimplePoa {
 /// A Proof of Authority consensus engine. Only one authority is valid at each block height.
 /// As ever, the genesis block does not require a seal. After that the authorities take turns
 /// in order.
-struct PoaRoundRobinByHeight {
-    authorities: Vec<ConsensusAuthority>,
+pub struct PoaRoundRobinByHeight {
+    pub authorities: Vec<ConsensusAuthority>,
 }
 
 impl Consensus for PoaRoundRobinByHeight {

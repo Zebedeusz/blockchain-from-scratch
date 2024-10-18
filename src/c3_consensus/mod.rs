@@ -11,8 +11,10 @@ mod p6_forking;
 
 // Re-export some individual consensus engines so they can be be re-used in the Client chapter.
 pub use p1_pow::Pow;
+pub use p3_poa::PoaRoundRobinByHeight;
 pub use p3_poa::SimplePoa;
-
+pub use p4_even_only::EvenOnly;
+pub use p5_interleave::PowOrPoaDigest;
 type Hash = u64;
 
 /// A Block Header similar to prior chapters of this tutorial.
