@@ -14,28 +14,22 @@ use super::{
 
 /// A Higher-order consensus engine that represents a change from one set of consensus rules (Before) to
 /// another set (After) at a specific block height
-struct Forked<D, Before, After> {
+pub struct Forked<D, Before, After> {
     /// The first block height at which the new consensus rules apply
-    fork_height: u64,
-    before: Before,
-    after: After,
-    phdata: PhantomData<D>,
+    pub fork_height: u64,
+    pub before: Before,
+    pub after: After,
+    pub phdata: PhantomData<D>,
 }
 
 impl<D, B, A> Consensus for Forked<D, B, A>
 where
     D: Clone + core::fmt::Debug + Eq + PartialEq + std::hash::Hash,
-    // + Into<B::Digest>
-    // + Into<A::Digest>,
     B::Digest: TryFrom<D>, // Use TryFrom here for PoW digest (u64)
     A::Digest: TryFrom<D>, // Use TryFrom here for PoA digest (ConsensusAuthority)
     D: From<B::Digest> + From<A::Digest>, // Handle From in the other direction
-    // + TryFrom<A::Digest>
-    // + TryFrom<B::Digest>,
     B: Consensus,
     A: Consensus,
-    // B::Digest: Into<D>,
-    // A::Digest: Into<D>,
 {
     type Digest = D;
 
@@ -142,7 +136,7 @@ fn change_authorities(
 }
 
 /// Create a PoW consensus engine that changes the difficulty part way through the chain's history.
-fn change_difficulty(
+pub fn change_difficulty(
     fork_height: u64,
     initial_difficulty: u64,
     final_difficulty: u64,

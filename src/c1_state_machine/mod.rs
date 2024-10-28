@@ -8,6 +8,8 @@ mod p4_accounted_currency;
 mod p5_digital_cash;
 mod p6_open_ended;
 
+pub use p4_accounted_currency::Balances;
+pub use p4_accounted_currency::{AccountedCurrency, AccountingTransaction};
 /// A state machine - Generic over the transition type
 pub trait StateMachine {
     /// The states that can be occupied by this machine

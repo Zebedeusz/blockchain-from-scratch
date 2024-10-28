@@ -4,8 +4,8 @@
 //! The concepts are identical here, but now that we have a client tracking a proper block database,
 //! we can explore more advanced fork choice algorithms. In particular, we can now explore GHOST.
 
-use super::{Header, FullClient, Consensus};
-use crate::c3_consensus::{Pow, SimplePoa, ConsensusAuthority};
+use super::{Consensus, FullClient, Header};
+use crate::c3_consensus::{ConsensusAuthority, Pow, SimplePoa};
 
 /// A means for a blockchain client to decide which chain is best among the many
 /// that it potentially knows about.
@@ -92,7 +92,7 @@ impl ForkChoice<Pow> for Ghost {
 // Finally, we will provide a convenience method directly on our client that simply calls
 // into the corresponding method on the ForkChoice rule. You may need to add some trait
 // bounds to make this work.
-impl<C, SM, FC, P> FullClient<C, SM, FC, P> {
+impl<C, SM, FC, P, S> FullClient<C, SM, FC, P, S> {
     /// Return the hash of the best block currently known to the client
     fn best_block(&self) -> u64 {
         todo!("Exercise 9")

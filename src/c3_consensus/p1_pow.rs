@@ -10,6 +10,7 @@ use crate::hash;
 /// A Proof of Work consensus engine. This is the same consensus logic that we
 /// implemented in the previous chapter. Here we simply re-implement it in the
 /// consensus framework that will be used throughout this chapter.
+#[derive(Clone)]
 pub struct Pow {
     pub threshold: u64,
 }

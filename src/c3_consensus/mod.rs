@@ -15,6 +15,8 @@ pub use p3_poa::PoaRoundRobinByHeight;
 pub use p3_poa::SimplePoa;
 pub use p4_even_only::EvenOnly;
 pub use p5_interleave::PowOrPoaDigest;
+pub use p6_forking::change_difficulty;
+pub use p6_forking::Forked;
 type Hash = u64;
 
 /// A Block Header similar to prior chapters of this tutorial.
@@ -27,11 +29,11 @@ type Hash = u64;
 /// the complete blocks.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct Header<Digest> {
-    parent: Hash,
-    height: u64,
-    state_root: Hash,
-    extrinsics_root: Hash,
-    consensus_digest: Digest,
+    pub parent: Hash,
+    pub height: u64,
+    pub state_root: Hash,
+    pub extrinsics_root: Hash,
+    pub consensus_digest: Digest,
 }
 /// A Consensus Engine. Responsible for Sealing blocks and verifying their seals
 ///

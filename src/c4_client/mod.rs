@@ -12,9 +12,12 @@
 
 // TODO Exercise for later: Client does a hard fork at a particular block height. The fork logic is to change runtimes.
 
+use std::collections::HashMap;
+
 use crate::{
-    c1_state_machine::StateMachine,
+    c1_state_machine::{AccountedCurrency, StateMachine},
     c3_consensus::{Consensus, Header},
+    hash,
 };
 use p1_data_structure::Block;
 use p3_fork_choice::ForkChoice;
@@ -40,17 +43,16 @@ type Hash = u64;
 ///
 /// As you work through the sections in this chapter, you will add features to the client
 /// by implementing more and more methods on it.
-/// 
+///
 /// In practice the trait bounds here will always be the same:
 /// C: Client
 /// SM: StateMachine
 /// FC: ForkChoice<C>
 /// P: TransactionPool<SM>
-/// 
+///
 /// But we leave them unconstrained here to avoid repeating many where clauses throughout the section.
 /// Instead we bind them on impl blocks.
-pub struct FullClient<C, SM, FC, P>
-{
+pub struct FullClient<C, SM, FC, P, S> {
     /// The consensus engine used by this client.
     consensus_engine: C,
     /// The state machine used by this client.
@@ -59,9 +61,72 @@ pub struct FullClient<C, SM, FC, P>
     fork_choice: FC,
     /// The transaction pool used by this client.
     transaction_pool: P,
-
     // TODO: You are free to add more fields here, and you will probably need to.
     // Please document them as you add them.
+    storage: S,
+}
+
+// Key-value blocks storage where keys are hashes of blocks and values are the corresponding blocks.
+pub trait Storage<C: Consensus, SM: StateMachine>
+where
+    Block<C, SM>: std::hash::Hash,
+{
+    fn new() -> Self;
+
+    fn add_block(&mut self, block: Block<C, SM>);
+    fn get_block(&self, block_hash: Hash) -> Option<Block<C, SM>>;
+    fn get_last_block(&self) -> Block<C, SM>;
+
+    fn current_state(&self) -> SM::State;
+    fn set_state(&mut self, state: SM::State);
+}
+
+pub struct BasicStorage<C: Consensus, SM: StateMachine> {
+    last_block: Block<C, SM>,
+    state: SM::State,
+    blocks_map: HashMap<Hash, Block<C, SM>>,
+}
+
+impl<C, SM> Storage<C, SM> for BasicStorage<C, SM>
+where
+    C: Consensus,
+    SM: StateMachine,
+    Block<C, SM>: std::hash::Hash + Clone,
+    SM::State: Default + Clone + std::hash::Hash,
+    SM::Transition: std::hash::Hash + Clone,
+    C::Digest: Default,
+{
+    fn new() -> Self {
+        let genesis_block = Block::genesis(&SM::State::default());
+        let mut blocks_map = HashMap::new();
+        blocks_map.insert(hash(&genesis_block), genesis_block.clone());
+
+        return BasicStorage {
+            last_block: genesis_block,
+            state: SM::State::default(),
+            blocks_map: blocks_map,
+        };
+    }
+
+    fn add_block(&mut self, block: Block<C, SM>) {
+        self.blocks_map.insert(hash(&block), block);
+    }
+
+    fn get_block(&self, block_hash: Hash) -> Option<Block<C, SM>> {
+        self.blocks_map.get(&block_hash).cloned()
+    }
+
+    fn get_last_block(&self) -> Block<C, SM> {
+        self.last_block.clone()
+    }
+
+    fn current_state(&self) -> <SM as StateMachine>::State {
+        self.state.clone()
+    }
+
+    fn set_state(&mut self, state: <SM as StateMachine>::State) {
+        self.state = state;
+    }
 }
 
 //TODO Consider exploring LightClient as well. It may import headers but not blocks for example.

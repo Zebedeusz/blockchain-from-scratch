@@ -2,7 +2,7 @@
 //!
 //! The transaction pool is where transactions that are not yet included in the blockchain
 //! are queued before they are inserted into blocks.
-//! 
+//!
 //! Maintaining a transaction pool includes:
 //! * Accepting transactions from users
 //! * Removing transactions that are included in blocks as they are imported
@@ -18,7 +18,7 @@ pub trait TransactionPool<SM: StateMachine> {
     /// Try to add a new transaction to the pool. Return whether the operation succeeded.
     fn try_insert(&mut self, t: SM::Transition) -> bool;
 
-    /// Remove a given transaction from the pool if it sexists there.
+    /// Remove a given transaction from the pool if it exists there.
     fn remove(&mut self, t: SM::Transition);
 
     /// Get the total number of transactions in the pool
@@ -30,17 +30,16 @@ pub trait TransactionPool<SM: StateMachine> {
     //TODO actually, the pool itself could be an iterator.
     // Maybe make a blanket impl for all pools based on this method.
     /// Take the next transaction out of the transaction pool
-    /// 
+    ///
     /// The notion of next is opaque and implementation dependent.
     /// Different chains prioritize transactions differently, usually by economic means.
     fn next_from_pool(&mut self) -> Option<SM::Transition>;
 }
 
-
 // First we add some new user-facing methods to the client.
 // These are basically wrappers around methods that the pool itself provides.
-impl<C, SM, FC, P> FullClient<C, SM, FC, P>           
-    where
+impl<C, SM, FC, P, S> FullClient<C, SM, FC, P, S>
+where
     SM: StateMachine,
 {
     /// Submit a transaction to the client's transaction pool to hopefully
@@ -88,9 +87,9 @@ impl<SM: StateMachine> TransactionPool<SM> for SimplePool<SM> {
 
 /// A transaction pool that assigns a priority to each transaction and then provides
 /// them (to the authoring process, presumably) highest priority first.
-/// 
+///
 /// It also refuses to queue transactions whose priority is below a certain threshold.
-/// 
+///
 /// This is where the blockspace market takes place. A lot of interesting game theory
 /// happens here.
 pub struct PriorityPool<T, P: Fn(T) -> u64> {
@@ -99,13 +98,13 @@ pub struct PriorityPool<T, P: Fn(T) -> u64> {
     /// The minimum priority that will be accepted. Any transaction with a
     /// priority below this value will be rejected.
     minimum_priority: u64,
-    ph_data: PhantomData<T>
+    ph_data: PhantomData<T>,
 }
 
 impl<SM, P> TransactionPool<SM> for PriorityPool<SM::Transition, P>
 where
     SM: StateMachine,
-    P: Fn(SM::Transition) -> u64
+    P: Fn(SM::Transition) -> u64,
 {
     fn try_insert(&mut self, t: <SM as StateMachine>::Transition) -> bool {
         todo!()
@@ -129,18 +128,18 @@ where
 }
 
 /// A transaction pool that censors some transactions.
-/// 
+///
 /// It refuses to queue any transactions that are might be associated with terrorists.
 pub struct CensoringPool<T, P: Fn(T) -> bool> {
     /// A means of determining whether a transaction may be from a terrorist
     might_be_terrorist: P,
-    ph_data: PhantomData<T>
+    ph_data: PhantomData<T>,
 }
 
 impl<SM, P> TransactionPool<SM> for CensoringPool<SM::Transition, P>
 where
     SM: StateMachine,
-    P: Fn(SM::Transition) -> bool
+    P: Fn(SM::Transition) -> bool,
 {
     fn try_insert(&mut self, t: <SM as StateMachine>::Transition) -> bool {
         todo!()
@@ -186,8 +185,6 @@ where
 //     assert_eq!(client.next_from_pool(), t);
 
 // }
-
-
 
 // More tests for block importing to make sure that transactions that are imported
 // to the chain are correctly removed from the pool.
