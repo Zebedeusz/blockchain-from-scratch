@@ -27,7 +27,7 @@ where
     D: Clone + core::fmt::Debug + Eq + PartialEq + std::hash::Hash,
     B::Digest: TryFrom<D>, // Use TryFrom here for PoW digest (u64)
     A::Digest: TryFrom<D>, // Use TryFrom here for PoA digest (ConsensusAuthority)
-    D: From<B::Digest> + From<A::Digest>, // Handle From in the other direction
+    D: From<B::Digest> + From<A::Digest> + Default, // Handle From in the other direction
     B: Consensus,
     A: Consensus,
 {
@@ -80,14 +80,23 @@ where
     fn seal(
         &self,
         parent_digest: &Self::Digest,
-        partial_header: Header<()>,
+        partial_header: Header<Self::Digest>,
     ) -> Option<Header<Self::Digest>> {
         if partial_header.height < self.fork_height {
             // Convert parent digest to PoW digest
             if let Ok(pow_digest) = B::Digest::try_from((*parent_digest).clone()) {
                 return self
                     .before
-                    .seal(&pow_digest, partial_header)
+                    .seal(
+                        &pow_digest,
+                        Header {
+                            parent: partial_header.parent,
+                            height: partial_header.height,
+                            state_root: partial_header.state_root,
+                            extrinsics_root: partial_header.extrinsics_root,
+                            consensus_digest: <B as Consensus>::Digest::default(),
+                        },
+                    )
                     .map(|header| Header {
                         height: header.height,
                         state_root: header.state_root,
@@ -102,7 +111,16 @@ where
             if let Ok(poa_digest) = A::Digest::try_from((*parent_digest).clone()) {
                 return self
                     .after
-                    .seal(&poa_digest, partial_header)
+                    .seal(
+                        &poa_digest,
+                        Header {
+                            parent: partial_header.parent,
+                            height: partial_header.height,
+                            state_root: partial_header.state_root,
+                            extrinsics_root: partial_header.extrinsics_root,
+                            consensus_digest: <A as Consensus>::Digest::default(),
+                        },
+                    )
                     .map(|header| Header {
                         height: header.height,
                         state_root: header.state_root,

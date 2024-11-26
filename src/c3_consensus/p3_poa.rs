@@ -12,6 +12,7 @@
 use super::{Consensus, ConsensusAuthority, Header};
 
 /// A Proof of Authority consensus engine. If any of the authorities have signed the block, it is valid.
+#[derive(Hash, Clone)]
 pub struct SimplePoa {
     pub authorities: Vec<ConsensusAuthority>,
 }
@@ -43,6 +44,18 @@ impl Default for Header<SlotDigest> {
     }
 }
 
+impl Default for Header<()> {
+    fn default() -> Self {
+        Header {
+            state_root: Default::default(),
+            extrinsics_root: Default::default(),
+            parent: Default::default(),
+            height: Default::default(),
+            consensus_digest: (),
+        }
+    }
+}
+
 impl Consensus for SimplePoa {
     type Digest = ConsensusAuthority;
 
@@ -50,7 +63,11 @@ impl Consensus for SimplePoa {
         return self.authorities.contains(&header.consensus_digest);
     }
 
-    fn seal(&self, _: &Self::Digest, partial_header: Header<()>) -> Option<Header<Self::Digest>> {
+    fn seal(
+        &self,
+        _: &Self::Digest,
+        partial_header: Header<Self::Digest>,
+    ) -> Option<Header<Self::Digest>> {
         let header: Header<Self::Digest> = Header {
             consensus_digest: self.authorities.get(0).unwrap().clone(),
             state_root: partial_header.state_root,
@@ -89,7 +106,11 @@ impl Consensus for PoaRoundRobinByHeight {
                 .clone();
     }
 
-    fn seal(&self, _: &Self::Digest, partial_header: Header<()>) -> Option<Header<Self::Digest>> {
+    fn seal(
+        &self,
+        _: &Self::Digest,
+        partial_header: Header<Self::Digest>,
+    ) -> Option<Header<Self::Digest>> {
         let auth_that_is_supposed_to_sign =
             (partial_header.height - 1) % (self.authorities.len() as u64);
 
@@ -123,7 +144,7 @@ struct PoaRoundRobinBySlot {
 /// A digest used for PoaRoundRobinBySlot. The digest contains the slot number as well as the signature.
 /// In addition to checking that the right signer has signed for the slot, you must check that the slot is
 /// always strictly increasing. But remember that slots may be skipped.
-#[derive(Hash, Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Hash, Debug, PartialEq, Eq, Clone, Copy, Default)]
 struct SlotDigest {
     slot: u64,
     signature: ConsensusAuthority,
@@ -156,7 +177,7 @@ impl Consensus for PoaRoundRobinBySlot {
     fn seal(
         &self,
         parent_digest: &Self::Digest,
-        partial_header: Header<()>,
+        partial_header: Header<Self::Digest>,
     ) -> Option<Header<Self::Digest>> {
         let parent_pos = self
             .authorities
@@ -203,7 +224,7 @@ fn cs3_simple_poa_seal() {
     let authorities = vec![ConsensusAuthority::Alice, ConsensusAuthority::Bob];
     let poa = SimplePoa { authorities };
 
-    let partial_header = Header::<()>::default();
+    let partial_header = Header::<ConsensusAuthority>::default();
     let sealed_header = poa
         .seal(&ConsensusAuthority::Alice, partial_header)
         .unwrap();
@@ -298,7 +319,7 @@ fn cs3_poa_round_robin_by_slot_seal() {
         signature: ConsensusAuthority::Alice,
     };
 
-    let mut partial_header = Header::<()>::default();
+    let mut partial_header = Header::default();
     let mut sealed_header = poa.seal(&parent_digest, partial_header).unwrap();
 
     assert_eq!(sealed_header.consensus_digest.slot, 2);
@@ -307,7 +328,7 @@ fn cs3_poa_round_robin_by_slot_seal() {
         ConsensusAuthority::Bob
     );
 
-    partial_header = Header::<()>::default();
+    partial_header = Header::default();
     sealed_header = poa
         .seal(&sealed_header.consensus_digest, partial_header)
         .unwrap();

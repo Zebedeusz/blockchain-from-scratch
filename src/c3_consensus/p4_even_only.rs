@@ -27,7 +27,7 @@ impl<Inner: Consensus> Consensus for EvenOnly<Inner> {
     fn seal(
         &self,
         parent_digest: &Self::Digest,
-        partial_header: Header<()>,
+        partial_header: Header<Self::Digest>,
     ) -> Option<Header<Self::Digest>> {
         if partial_header.state_root % 2 == 0 {
             return self.inner.seal(parent_digest, partial_header);
@@ -103,12 +103,12 @@ fn cs4_even_only_seal_valid() {
     let even_only = EvenOnly { inner: pow };
 
     let parent_digest = 0;
-    let partial_header = Header {
+    let partial_header = Header::<u64> {
         parent: 0,
         height: 1,
         state_root: 2,
         extrinsics_root: 0,
-        consensus_digest: (),
+        consensus_digest: 0,
     };
 
     assert!(even_only.seal(&parent_digest, partial_header).is_some());
@@ -120,12 +120,12 @@ fn cs4_even_only_seal_invalid() {
     let even_only = EvenOnly { inner: pow };
 
     let parent_digest = 0;
-    let partial_header = Header {
+    let partial_header = Header::<u64> {
         parent: 0,
         height: 1,
         state_root: 3,
         extrinsics_root: 0,
-        consensus_digest: (),
+        consensus_digest: 0,
     };
 
     assert!(even_only.seal(&parent_digest, partial_header).is_none());

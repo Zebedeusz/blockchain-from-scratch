@@ -24,6 +24,12 @@ pub enum PowOrPoaDigest {
     Poa(ConsensusAuthority),
 }
 
+impl Default for PowOrPoaDigest {
+    fn default() -> Self {
+        PowOrPoaDigest::Pow(0)
+    }
+}
+
 // Provides an implementation of convertion from u64 to PowOrPoaDigest.
 impl From<u64> for PowOrPoaDigest {
     fn from(v: u64) -> Self {
@@ -112,13 +118,22 @@ impl Consensus for AlternatingPowPoa {
     fn seal(
         &self,
         parent_digest: &Self::Digest,
-        partial_header: Header<()>,
+        partial_header: Header<Self::Digest>,
     ) -> Option<Header<Self::Digest>> {
         let digest = match parent_digest {
             PowOrPoaDigest::Pow(_) => {
                 PowOrPoaDigest::Poa(
                     self.poa
-                        .seal(&ConsensusAuthority::Alice, partial_header.clone())
+                        .seal(
+                            &ConsensusAuthority::Alice,
+                            Header {
+                                parent: partial_header.parent,
+                                height: partial_header.height,
+                                state_root: partial_header.state_root,
+                                extrinsics_root: partial_header.extrinsics_root,
+                                consensus_digest: ConsensusAuthority::default(),
+                            },
+                        )
                         .unwrap()
                         .clone()
                         .consensus_digest,
@@ -127,7 +142,16 @@ impl Consensus for AlternatingPowPoa {
             }
             PowOrPoaDigest::Poa(_) => PowOrPoaDigest::Pow(
                 self.pow
-                    .seal(&u64::MIN, partial_header.clone())
+                    .seal(
+                        &u64::MIN,
+                        Header {
+                            parent: partial_header.parent,
+                            height: partial_header.height,
+                            state_root: partial_header.state_root,
+                            extrinsics_root: partial_header.extrinsics_root,
+                            consensus_digest: 0,
+                        },
+                    )
                     .unwrap()
                     .clone()
                     .consensus_digest,
@@ -219,12 +243,12 @@ fn cs5_alternating_pow_poa_seal_pow() {
     let consensus = AlternatingPowPoa { pow, poa };
 
     let parent_digest = PowOrPoaDigest::Poa(ConsensusAuthority::Alice);
-    let partial_header = Header {
+    let partial_header = Header::<PowOrPoaDigest> {
         parent: 0,
         height: 1,
         state_root: 1,
         extrinsics_root: 1,
-        consensus_digest: (),
+        consensus_digest: PowOrPoaDigest::Pow(0),
     };
 
     let sealed_header = consensus.seal(&parent_digest, partial_header).unwrap();
@@ -243,12 +267,12 @@ fn cs5_alternating_pow_poa_seal_poa() {
     let consensus = AlternatingPowPoa { pow, poa };
 
     let parent_digest = PowOrPoaDigest::Pow(42);
-    let partial_header = Header {
+    let partial_header = Header::<PowOrPoaDigest> {
         parent: 0,
         height: 1,
         state_root: 1,
         extrinsics_root: 1,
-        consensus_digest: (),
+        consensus_digest: PowOrPoaDigest::Pow(0),
     };
 
     let sealed_header = consensus.seal(&parent_digest, partial_header).unwrap();

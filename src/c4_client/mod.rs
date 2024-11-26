@@ -15,7 +15,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    c1_state_machine::{AccountedCurrency, StateMachine},
+    c1_state_machine::{AccountedCurrency, BalancesB, StateMachine},
     c3_consensus::{Consensus, Header},
     hash,
 };
@@ -75,16 +75,22 @@ where
 
     fn add_block(&mut self, block: Block<C, SM>);
     fn get_block(&self, block_hash: Hash) -> Option<Block<C, SM>>;
+
     fn get_last_block(&self) -> Block<C, SM>;
+    fn set_last_block(&mut self, block: Block<C, SM>);
 
     fn current_state(&self) -> SM::State;
+    fn set_current_state(&mut self, state: SM::State);
+
+    fn get_state(&self, state_root: Hash) -> Option<SM::State>;
     fn set_state(&mut self, state: SM::State);
 }
 
 pub struct BasicStorage<C: Consensus, SM: StateMachine> {
     last_block: Block<C, SM>,
-    state: SM::State,
+    current_state: SM::State,
     blocks_map: HashMap<Hash, Block<C, SM>>,
+    states_map: HashMap<Hash, SM::State>,
 }
 
 impl<C, SM> Storage<C, SM> for BasicStorage<C, SM>
@@ -97,14 +103,20 @@ where
     C::Digest: Default,
 {
     fn new() -> Self {
-        let genesis_block = Block::genesis(&SM::State::default());
+        let genesis_state = SM::State::default();
+        let genesis_block = Block::genesis(&genesis_state.clone());
+
         let mut blocks_map = HashMap::new();
         blocks_map.insert(hash(&genesis_block), genesis_block.clone());
 
+        let mut states_map = HashMap::new();
+        states_map.insert(genesis_block.header.state_root, genesis_state.clone());
+
         return BasicStorage {
             last_block: genesis_block,
-            state: SM::State::default(),
+            current_state: SM::State::default(),
             blocks_map: blocks_map,
+            states_map: states_map,
         };
     }
 
@@ -120,12 +132,24 @@ where
         self.last_block.clone()
     }
 
+    fn set_last_block(&mut self, block: Block<C, SM>) {
+        self.last_block = block.clone();
+    }
+
     fn current_state(&self) -> <SM as StateMachine>::State {
-        self.state.clone()
+        self.current_state.clone()
+    }
+
+    fn set_current_state(&mut self, state: <SM as StateMachine>::State) {
+        self.current_state = state;
+    }
+
+    fn get_state(&self, state_root: Hash) -> Option<<SM as StateMachine>::State> {
+        self.states_map.get(&state_root).cloned()
     }
 
     fn set_state(&mut self, state: <SM as StateMachine>::State) {
-        self.state = state;
+        self.states_map.insert(hash(&state), state.clone());
     }
 }
 

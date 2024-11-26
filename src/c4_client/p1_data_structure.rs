@@ -16,6 +16,8 @@
 //!
 //! This abstraction is the key idea behind blockchain _frameworks_ like Substrate or the Cosmos SDK.
 
+use crate::c1_state_machine::AccountedCurrency;
+use crate::c3_consensus::Pow;
 use crate::hash;
 
 use super::p4_transaction_pool::TransactionPool;
@@ -165,7 +167,7 @@ impl<C, SM, FC, P, S> FullClient<C, SM, FC, P, S>
 where
     SM: StateMachine,
     C: Consensus,
-    FC: ForkChoice<C>,
+    FC: ForkChoice<C, SM>,
     P: TransactionPool<SM>,
     S: Storage<C, SM>,
     Block<C, SM>: std::hash::Hash,
@@ -198,11 +200,32 @@ impl<C, SM, FC, P, S> Default for FullClient<C, SM, FC, P, S>
 where
     C: Consensus,
     SM: StateMachine,
-    FC: ForkChoice<C>,
+    FC: ForkChoice<C, SM>,
     S: Storage<C, SM>,
     Block<C, SM>: std::hash::Hash,
 {
     fn default() -> Self {
         todo!("Exerise 10")
+    }
+}
+
+impl Default for Block<Pow, AccountedCurrency> {
+    fn default() -> Self {
+        Block {
+            header: Header::<<Pow as Consensus>::Digest>::default(),
+            body: Vec::new(),
+        }
+    }
+}
+
+impl Default for Header<<Pow as Consensus>::Digest> {
+    fn default() -> Self {
+        Self {
+            parent: Default::default(),
+            height: Default::default(),
+            state_root: Default::default(),
+            extrinsics_root: Default::default(),
+            consensus_digest: Default::default(),
+        }
     }
 }

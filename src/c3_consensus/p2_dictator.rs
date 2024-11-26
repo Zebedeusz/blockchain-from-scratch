@@ -25,7 +25,11 @@ impl Consensus for DictatorConsensus {
     }
 
     /// Sign the given partial header by the dictator
-    fn seal(&self, _: &Self::Digest, partial_header: Header<()>) -> Option<Header<Self::Digest>> {
+    fn seal(
+        &self,
+        _: &Self::Digest,
+        partial_header: Header<Self::Digest>,
+    ) -> Option<Header<Self::Digest>> {
         let header: Header<Self::Digest> = Header {
             consensus_digest: self.dictator,
             state_root: partial_header.state_root,
@@ -34,5 +38,11 @@ impl Consensus for DictatorConsensus {
             height: partial_header.height,
         };
         return Some(header);
+    }
+}
+
+impl Default for ConsensusAuthority {
+    fn default() -> Self {
+        ConsensusAuthority::Alice
     }
 }

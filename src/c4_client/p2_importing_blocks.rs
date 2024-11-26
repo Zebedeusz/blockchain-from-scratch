@@ -56,7 +56,7 @@ where
     fn import_block(&mut self, block: Block<C, SM>) -> bool {
         let last_block: Block<C, SM> = self.storage.get_last_block();
 
-        if block.header.height - 1 != last_block.header.height {
+        if block.header.height != last_block.header.height + 1 {
             return false;
         }
         if block.header.parent != hash(&last_block.header) {
@@ -149,10 +149,6 @@ fn init_client_for_test() -> impl ImportBlock<Pow, AccountedCurrency> {
 #[test]
 fn cl2_import_valid_block() {
     let mut client = init_client_for_test();
-
-    let mut block = Block::<Pow, AccountedCurrency>::genesis(
-        &<AccountedCurrency as StateMachine>::State::default(),
-    );
 
     let current_state = client.current_state();
     let extrinsic = AccountingTransaction::Mint {
@@ -284,10 +280,6 @@ fn cl2_get_block_not_existing() {
 #[test]
 fn cl2_import_valid_block_and_get_it() {
     let mut client = init_client_for_test();
-
-    let mut block = Block::<Pow, AccountedCurrency>::genesis(
-        &<AccountedCurrency as StateMachine>::State::default(),
-    );
 
     let current_state = client.current_state();
     let extrinsic = AccountingTransaction::Mint {

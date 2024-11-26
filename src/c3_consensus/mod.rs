@@ -18,8 +18,6 @@ pub use p5_interleave::PowOrPoaDigest;
 pub use p6_forking::change_difficulty;
 pub use p6_forking::Forked;
 type Hash = u64;
-
-/// A Block Header similar to prior chapters of this tutorial.
 ///
 /// Different consensus engines, require different information in the consensus digest.
 /// Therefore, the header is now generic over the digest type.
@@ -27,7 +25,7 @@ type Hash = u64;
 /// Consensus engines do not know or care about the blockchain's state machine,
 /// which means they can operate entirely at the header level. They never need to touch
 /// the complete blocks.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Header<Digest> {
     pub parent: Hash,
     pub height: u64,
@@ -40,7 +38,7 @@ pub struct Header<Digest> {
 /// Consensus exists independently of execution logic, and therefore operates
 /// only on the block headers.
 pub trait Consensus {
-    type Digest: Clone + core::fmt::Debug + Eq + PartialEq + std::hash::Hash;
+    type Digest: Clone + core::fmt::Debug + Eq + PartialEq + std::hash::Hash + Default;
 
     /// Validates that a header is valid according to consensus rules. This
     /// function checks ONLY consensus-related aspects such as the signature
@@ -66,7 +64,7 @@ pub trait Consensus {
     fn seal(
         &self,
         parent_digest: &Self::Digest,
-        partial_header: Header<()>,
+        partial_header: Header<Self::Digest>,
     ) -> Option<Header<Self::Digest>>;
     // NOTE TO SELF. For slot-based PoA etc, just look at the system time. It's what real-world aura does
 
@@ -107,7 +105,11 @@ impl Consensus for () {
     }
 
     /// No real sealing is required.
-    fn seal(&self, _: &Self::Digest, partial_header: Header<()>) -> Option<Header<Self::Digest>> {
+    fn seal(
+        &self,
+        _: &Self::Digest,
+        partial_header: Header<Self::Digest>,
+    ) -> Option<Header<Self::Digest>> {
         return Some(partial_header);
     }
 }

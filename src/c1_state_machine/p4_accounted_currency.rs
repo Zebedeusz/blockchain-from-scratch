@@ -13,7 +13,7 @@ use std::{collections::HashMap, hash::Hash};
 
 /// This state machine models a multi-user currency system. It tracks the balance of each
 /// user and allows users to send funds to one another.
-#[derive(Clone)]
+#[derive(Clone, Hash)]
 pub struct AccountedCurrency;
 
 /// The main balances mapping.
@@ -39,7 +39,7 @@ impl Hash for BalancesB {
 }
 
 /// The state transitions that users can make in an accounted currency system
-#[derive(Clone, Hash)]
+#[derive(Clone, Hash, PartialEq, Debug)]
 pub enum AccountingTransaction {
     /// Create some new money for the given minter in the given amount
     Mint { minter: User, amount: u64 },
